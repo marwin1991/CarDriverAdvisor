@@ -3,4 +3,8 @@
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="current_speed">Current speed:</string>
+    <string name="init_current_speed_value">0.0 km/h</string>
+    <string name="speed_limit">Speed limit:</string>
+    <string name="init_speed_limit_value">-- km/h</string>
 </resources>

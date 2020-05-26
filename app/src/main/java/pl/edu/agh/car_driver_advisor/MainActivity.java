@@ -4,14 +4,24 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import pl.edu.agh.car_driver_advisor.carvelocity.CarVelocityChecker;
+import pl.edu.agh.car_driver_advisor.carvelocity.VoiceNotifier;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
-import android.util.TimeUtils;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.vision.CameraSource;
 import com.google.android.gms.vision.Tracker;
@@ -20,14 +30,27 @@ import com.google.android.gms.vision.face.FaceDetector;
 import com.google.android.gms.vision.face.LargestFaceFocusingProcessor;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class MainActivity extends AppCompatActivity {
 
+    final static int REQUEST_CAMERA_PERMISSION_ID = 1001;
+    final static int REQUEST_ALL_REQUIRED_PERMISSIONS_ID = 8836;
+
     SurfaceView cameraView;
     CameraSource cameraSource;
-    final int RequestCameraPermissionID = 1001;
     FaceDetector detector;
+
+    private TextView carSpeedTextView;
+    private TextView speedLimitTextView;
+    private Handler speedLimitChangeHandler;
+    private VoiceNotifier voiceNotifier;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +66,10 @@ public class MainActivity extends AppCompatActivity {
                 .setMode(FaceDetector.FAST_MODE) // for one face this is OK
                 .build();
 
+        carSpeedTextView = findViewById(R.id.carSpeedTextView);
+        speedLimitTextView = findViewById(R.id.speedLimitTextView);
+        voiceNotifier = new VoiceNotifier(getApplicationContext());
+        speedLimitChangeHandler = new SpeedLimitChangeHandler(this);
 
         if (!detector.isOperational()) {
             Log.w("MainActivity", "Detector Dependencies are not yet available");
@@ -63,7 +90,7 @@ public class MainActivity extends AppCompatActivity {
                             if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.CAMERA)) {
 
                             } else {
-                                ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.CAMERA}, RequestCameraPermissionID);
+                                ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION_ID);
                             }
                         } else {
                             // Permission has already been granted
@@ -92,9 +119,8 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-
         switch (requestCode) {
-            case RequestCameraPermissionID: {
+            case REQUEST_CAMERA_PERMISSION_ID: {
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                         return;
@@ -105,10 +131,17 @@ public class MainActivity extends AppCompatActivity {
                         e.printStackTrace();
                     }
                 }
+                break;
+            }
+            case REQUEST_ALL_REQUIRED_PERMISSIONS_ID: {
+                if (grantResults.length > 0 && Arrays.stream(grantResults)
+                        .allMatch(status -> status == PackageManager.PERMISSION_GRANTED)) {
+                    accessLocation();
+                }
+                break;
             }
         }
     }
-
 
     private static class GraphicFaceTracker extends Tracker<Face> {
 
@@ -153,8 +186,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                     break;
             }
-
-
         }
 
         /**
@@ -175,4 +206,108 @@ public class MainActivity extends AppCompatActivity {
             detectEyesState(value);
         }
     }
+
+    private final LocationListener locationListener = new LocationListener() {
+
+        @Override
+        public void onLocationChanged(Location location) {
+            final double latitude = location.getLatitude();
+            final double longitude = location.getLongitude();
+
+            if(location.hasSpeed()) {
+                double speed = location.getSpeed();
+                carSpeedTextView.setText(String.format(Locale.US, "%f km/h", speed * 3.6));
+                new Thread(new CarVelocityChecker(voiceNotifier, latitude, longitude, speed,
+                        speedLimitChangeHandler)).start();
+            }
+            else {
+                // Speed could be calculated "manually" here. Distance to last location and time.
+                String noSignalMsg = "GPS signal lost";
+                carSpeedTextView.setText(noSignalMsg);
+            }
+        }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+
+        }
+
+        @Override
+        public void onProviderEnabled(String provider) {
+
+        }
+
+        @Override
+        public void onProviderDisabled(String provider) {
+
+        }
+
+    };
+
+    private void accessLocation(){
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+        LocationProvider locationProvider = Objects.requireNonNull(locationManager)
+                .getProvider(LocationManager.GPS_PROVIDER);
+
+        if (locationProvider != null) {
+            try {
+                int locationMinRequestsTimeInterval = 1000; // 1 sec
+                locationManager.requestLocationUpdates(locationProvider.getName(),
+                        locationMinRequestsTimeInterval, 0, this.locationListener);
+            } catch (SecurityException e) {
+                e.printStackTrace();
+            }
+        } else {
+            Toast.makeText(this, "Location Provider is not available at the moment!",
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        List<String> permissionsList = getRequiredPermissionsList();
+        if(!permissionsList.isEmpty()) {
+            ActivityCompat.requestPermissions(this,
+                    permissionsList.toArray(new String[0]), REQUEST_ALL_REQUIRED_PERMISSIONS_ID);
+        }
+        else {
+            accessLocation();
+        }
+    }
+
+    private boolean shouldRequestForGivenPermission(String permission) {
+        return ContextCompat.checkSelfPermission(this, permission)
+                != PackageManager.PERMISSION_GRANTED;
+    }
+
+    private List<String> getRequiredPermissionsList() {
+        // add permissions here to request on start-up
+        List<String> permissionsToGet = Arrays.asList(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.CAMERA
+        );
+
+        return permissionsToGet.stream()
+                .filter(this::shouldRequestForGivenPermission)
+                .collect(Collectors.toList());
+    }
+
+    private static class SpeedLimitChangeHandler extends Handler {
+
+        private final WeakReference<MainActivity> mActivity;
+
+        SpeedLimitChangeHandler(MainActivity activity) {
+            mActivity = new WeakReference<>(activity);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            MainActivity activity = mActivity.get();
+            String speedLimit = msg.getData().getString(CarVelocityChecker.SPEED_LIMIT_MSG_KEY);
+            activity.speedLimitTextView.setText(speedLimit);
+        }
+    }
+
 }
