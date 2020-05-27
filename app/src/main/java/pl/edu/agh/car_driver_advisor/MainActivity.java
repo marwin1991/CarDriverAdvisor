@@ -216,7 +216,8 @@ public class MainActivity extends AppCompatActivity {
 
             if(location.hasSpeed()) {
                 double speed = location.getSpeed();
-                carSpeedTextView.setText(String.format(Locale.US, "%f km/h", speed * 3.6));
+                carSpeedTextView.setText(String.format("%s km/h",
+                        Math. round(speed * 36) / 10.0));
                 new Thread(new CarVelocityChecker(voiceNotifier, latitude, longitude, speed,
                         speedLimitChangeHandler)).start();
             }
@@ -251,9 +252,10 @@ public class MainActivity extends AppCompatActivity {
 
         if (locationProvider != null) {
             try {
-                int locationMinRequestsTimeInterval = 1000; // 1 sec
+                int locationMinRequestsTimeInterval = 1000; // 1s
+                int minLocationUpdateDistance = 1;  // 1m
                 locationManager.requestLocationUpdates(locationProvider.getName(),
-                        locationMinRequestsTimeInterval, 0, this.locationListener);
+                        locationMinRequestsTimeInterval, minLocationUpdateDistance, this.locationListener);
             } catch (SecurityException e) {
                 e.printStackTrace();
             }
@@ -306,7 +308,7 @@ public class MainActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             MainActivity activity = mActivity.get();
             String speedLimit = msg.getData().getString(CarVelocityChecker.SPEED_LIMIT_MSG_KEY);
-            activity.speedLimitTextView.setText(speedLimit);
+            activity.speedLimitTextView.setText(String.format("%s km/h", speedLimit));
         }
     }
 

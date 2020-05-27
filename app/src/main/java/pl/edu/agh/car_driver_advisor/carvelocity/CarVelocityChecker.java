@@ -11,6 +11,10 @@ public class CarVelocityChecker implements Runnable {
     private final static float CONVERT_MS_TO_KMH = 3.6f;
     private final static String SPEED_EXCEEDED_NOTIFICATION_MSG = "Speed limit alert";
     public final static String SPEED_LIMIT_MSG_KEY = "speed-limit";
+    private final static long MIN_TIME_INTERVAL_BETWEEN_API_CALLS_IN_MS = 10000; // 10s
+
+    private static long lastApiCallTime;
+    private static Integer lastApiCallResult;
 
     private final Handler speedLimitChangeHandler;
     private final RouteDataProvider routeDataProvider;
@@ -22,7 +26,7 @@ public class CarVelocityChecker implements Runnable {
 
     public CarVelocityChecker(VoiceNotifier voiceNotifier, double latitude, double longitude,
                               double speed, Handler speedLimitChangeHandler) {
-        this.routeDataProvider = new RouteDataProvider(10000);
+        this.routeDataProvider = new RouteDataProvider();
         this.speedLimitChangeHandler = speedLimitChangeHandler;
         this.voiceNotifier = voiceNotifier;
         this.latitude = latitude;
@@ -32,9 +36,7 @@ public class CarVelocityChecker implements Runnable {
 
     @Override
     public void run() {
-        Optional<Integer> allowedSpeedOpt = routeDataProvider
-                .getAllowedSpeedForRouteWithGivenCords(latitude, longitude);
-
+        Optional<Integer> allowedSpeedOpt = getSpeedLimitFromAPIorCache();
         if(!allowedSpeedOpt.isPresent()) {
             return;
         }
@@ -52,6 +54,20 @@ public class CarVelocityChecker implements Runnable {
         b.putString(SPEED_LIMIT_MSG_KEY, String.valueOf(allowedSpeed));
         msg.setData(b);
         speedLimitChangeHandler.sendMessage(msg);
+    }
+
+    private Optional<Integer> getSpeedLimitFromAPIorCache() {
+        synchronized (CarVelocityChecker.class) {
+            long currentTime = System.currentTimeMillis();
+            if (lastApiCallTime + MIN_TIME_INTERVAL_BETWEEN_API_CALLS_IN_MS > currentTime) {
+                return Optional.ofNullable(lastApiCallResult);
+            }
+            lastApiCallTime = currentTime;
+            lastApiCallResult = routeDataProvider
+                    .getAllowedSpeedForRouteWithGivenCords(latitude, longitude).orElse(null);
+
+            return Optional.ofNullable(lastApiCallResult);
+        }
     }
 
 }
