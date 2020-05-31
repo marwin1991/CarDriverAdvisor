@@ -152,12 +152,18 @@ public class MainActivity extends AppCompatActivity {
 
         private int state = 0; // 0 - beginning , 1 - open, 2 - close
         private long closeTime = -1;
+        private boolean wasClosedToLongVoiceMsg = false;
+
+        private static final String CLOSE_MSG = "Wykryto że masz zamknięte oczy! Zatrzymaj samochód!";
 
         //Blining detection
         private int blinksInTimeDanger = 4;
         private int blinksTimeThreshold = 6000; // 5s
         private long blinkCounter = 0;
         private long firstBlinkTime = new Date().getTime();
+
+        private static final String BLINKS_MSG = "Wykryto niepokojące zachowanie twoich oczu! Zatrzymaj samochód!";
+
 
         void detectEyesState(float value) {
             switch (state) {
@@ -166,6 +172,7 @@ public class MainActivity extends AppCompatActivity {
                         //Both eyes open
                         state = 1;
                         closeTime = -1;
+                        wasClosedToLongVoiceMsg = false;
                     }
                     break;
 
@@ -187,8 +194,9 @@ public class MainActivity extends AppCompatActivity {
                         long blinksTimeDif = new Date().getTime() - firstBlinkTime;
                         if (blinksTimeDif <= blinksTimeThreshold) {
                             if (blinkCounter >= blinksInTimeDanger) {
-                                Log.i("BlinkTracker", "Too many blinks in short period of time!!!");
-                                Alert.makeAlert(MainActivity.this.getLayoutInflater(), MainActivity.this, "Too many blinks in short period of time!!!");
+                                Log.i("BlinkTracker", BLINKS_MSG);
+                                Alert.makeAlert(MainActivity.this.getLayoutInflater(), MainActivity.this, BLINKS_MSG);
+                                voiceNotifier.sendVoiceNotification(BLINKS_MSG);
                             } else {
                                 blinkCounter++;
                             }
@@ -201,11 +209,15 @@ public class MainActivity extends AppCompatActivity {
                         // eyes staies closed
                         long closeTimeDif = new Date().getTime() - closeTime;
                         if (closeTimeDif >= CLOSE_TIME_DIFF_DANGEROUS) {
-                            Log.i("BlinkTracker", "Eyes closed to long!");
-                            Alert.makeAlert(MainActivity.this.getLayoutInflater(), MainActivity.this, "Waring!!! Eyes closed to long!");
+                            Log.i("BlinkTracker", CLOSE_MSG);
+                            Alert.makeAlert(MainActivity.this.getLayoutInflater(), MainActivity.this, CLOSE_MSG);
                             try {
                                 Thread.sleep(300);
                             } catch (InterruptedException ignore) {
+                            }
+                            if(!wasClosedToLongVoiceMsg) {
+                                voiceNotifier.sendVoiceNotification(CLOSE_MSG);
+                                wasClosedToLongVoiceMsg = true;
                             }
                         }
 

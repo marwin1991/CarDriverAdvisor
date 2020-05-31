@@ -23,7 +23,7 @@ public class VoiceNotifier {
         });
     }
 
-    void sendVoiceNotification(String messageToRead) {
+    public void sendVoiceNotification(String messageToRead) {
         Intent checkTTSIntent = new Intent();
         checkTTSIntent.setAction(TextToSpeech.Engine.ACTION_CHECK_TTS_DATA);
         speakGivenSentences(messageToRead);
