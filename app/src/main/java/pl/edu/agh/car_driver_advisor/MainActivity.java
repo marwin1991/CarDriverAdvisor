@@ -155,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
 
         //Blining detection
         private int blinksInTimeDanger = 4;
-        private int blinksTimeThreshold = 5000; // 5s
+        private int blinksTimeThreshold = 6000; // 5s
         private long blinkCounter = 0;
         private long firstBlinkTime = new Date().getTime();
 
@@ -196,6 +196,7 @@ public class MainActivity extends AppCompatActivity {
                             firstBlinkTime = new Date().getTime();
                             blinkCounter = 0;
                         }
+
                     } else {
                         // eyes staies closed
                         long closeTimeDif = new Date().getTime() - closeTime;
