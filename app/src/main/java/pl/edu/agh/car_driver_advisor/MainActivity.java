@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
 import pl.edu.agh.car_driver_advisor.carvelocity.CarVelocityChecker;
 import pl.edu.agh.car_driver_advisor.carvelocity.VoiceNotifier;
 
@@ -143,16 +144,20 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private static class GraphicFaceTracker extends Tracker<Face> {
+    private class GraphicFaceTracker extends Tracker<Face> {
 
         private final float OPEN_THRESHOLD_PROBABILITY = 0.85f;
         private final float CLOSE_THRESHOLD_PROBABILITY = 0.4f;
         private final long CLOSE_TIME_DIFF_DANGEROUS = 3000; // 3s
-        private final long CLOSE_TIME_DIFF_DANGEROUS_2 = 7000; // 7s sleep
 
         private int state = 0; // 0 - beginning , 1 - open, 2 - close
         private long closeTime = -1;
 
+        //Blining detection
+        private int blinksInTimeDanger = 4;
+        private int blinksTimeThreshold = 5000; // 5s
+        private long blinkCounter = 0;
+        private long firstBlinkTime = new Date().getTime();
 
         void detectEyesState(float value) {
             switch (state) {
@@ -173,16 +178,36 @@ public class MainActivity extends AppCompatActivity {
                     break;
 
                 case 2:
-                    if (value > OPEN_THRESHOLD_PROBABILITY)  {
+                    if (value > OPEN_THRESHOLD_PROBABILITY) {
                         // Both eyes are open again
                         Log.i("BlinkTracker", "blink occurred!");
                         state = 0;
                         closeTime = -1;
+
+                        long blinksTimeDif = new Date().getTime() - firstBlinkTime;
+                        if (blinksTimeDif <= blinksTimeThreshold) {
+                            if (blinkCounter >= blinksInTimeDanger) {
+                                Log.i("BlinkTracker", "Too many blinks in short period of time!!!");
+                                Alert.makeAlert(MainActivity.this.getLayoutInflater(), MainActivity.this, "Too many blinks in short period of time!!!");
+                            } else {
+                                blinkCounter++;
+                            }
+                        } else {
+                            firstBlinkTime = new Date().getTime();
+                            blinkCounter = 0;
+                        }
                     } else {
                         // eyes staies closed
                         long closeTimeDif = new Date().getTime() - closeTime;
-                        if(closeTimeDif >= CLOSE_TIME_DIFF_DANGEROUS)
+                        if (closeTimeDif >= CLOSE_TIME_DIFF_DANGEROUS) {
                             Log.i("BlinkTracker", "Eyes closed to long!");
+                            Alert.makeAlert(MainActivity.this.getLayoutInflater(), MainActivity.this, "Waring!!! Eyes closed to long!");
+                            try {
+                                Thread.sleep(300);
+                            } catch (InterruptedException ignore) {
+                            }
+                        }
+
                     }
                     break;
             }
@@ -214,14 +239,13 @@ public class MainActivity extends AppCompatActivity {
             final double latitude = location.getLatitude();
             final double longitude = location.getLongitude();
 
-            if(location.hasSpeed()) {
+            if (location.hasSpeed()) {
                 double speed = location.getSpeed();
                 carSpeedTextView.setText(String.format("%s km/h",
-                        Math. round(speed * 36) / 10.0));
+                        Math.round(speed * 36) / 10.0));
                 new Thread(new CarVelocityChecker(voiceNotifier, latitude, longitude, speed,
                         speedLimitChangeHandler)).start();
-            }
-            else {
+            } else {
                 // Speed could be calculated "manually" here. Distance to last location and time.
                 String noSignalMsg = "GPS signal lost";
                 carSpeedTextView.setText(noSignalMsg);
@@ -245,7 +269,7 @@ public class MainActivity extends AppCompatActivity {
 
     };
 
-    private void accessLocation(){
+    private void accessLocation() {
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         LocationProvider locationProvider = Objects.requireNonNull(locationManager)
                 .getProvider(LocationManager.GPS_PROVIDER);
@@ -270,11 +294,10 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
 
         List<String> permissionsList = getRequiredPermissionsList();
-        if(!permissionsList.isEmpty()) {
+        if (!permissionsList.isEmpty()) {
             ActivityCompat.requestPermissions(this,
                     permissionsList.toArray(new String[0]), REQUEST_ALL_REQUIRED_PERMISSIONS_ID);
-        }
-        else {
+        } else {
             accessLocation();
         }
     }
