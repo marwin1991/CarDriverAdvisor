@@ -4,3 +4,4 @@ Car Driver Advisor - it is an android application to detect anomaly in driver's 
 # Functions
 - Detecting blinking eyes
 - Detecting eyes closed too long
+- Checking route speed limit, voice prompt after exceeeding it.
