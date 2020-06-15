@@ -7,4 +7,5 @@
     <string name="init_current_speed_value">0.0 km/h</string>
     <string name="speed_limit">Speed limit:</string>
     <string name="init_speed_limit_value">-- km/h</string>
+    <string name="enable_collision_detection">Enable collision detection</string>
 </resources>

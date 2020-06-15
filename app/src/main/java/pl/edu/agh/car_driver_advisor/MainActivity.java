@@ -7,10 +7,16 @@ import androidx.core.content.ContextCompat;
 
 import pl.edu.agh.car_driver_advisor.carvelocity.CarVelocityChecker;
 import pl.edu.agh.car_driver_advisor.carvelocity.VoiceNotifier;
+import pl.edu.agh.car_driver_advisor.sensors.DialogService;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -19,6 +25,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.TextView;
@@ -35,18 +44,30 @@ import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
     final static int REQUEST_CAMERA_PERMISSION_ID = 1001;
     final static int REQUEST_ALL_REQUIRED_PERMISSIONS_ID = 8836;
 
+    private final static int ACC_THRESHOLD = 1000;
+    private final static String SENSOR_TAG = "SensorHandler";
+
     SurfaceView cameraView;
     CameraSource cameraSource;
     FaceDetector detector;
+    SensorManager sensorManager;
+    Sensor accelerometer;
+
+    private AlertDialog crashAlertDialog;
+    private AlertDialog emergencyCallAlertDialog;
+    private float lastX = 0.0f;
+    private float lastY = 0.0f;
+    private float lastZ = 0.0f;
+    private long lastUpdate = 0L;
+    private boolean useAccelerometer = false;
 
     private TextView carSpeedTextView;
     private TextView speedLimitTextView;
@@ -58,7 +79,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        cameraView = (SurfaceView) findViewById(R.id.surface_view);
+        prepareSensors();
+        crashAlertDialog = DialogService.createCrashDialog(this);
+        emergencyCallAlertDialog = DialogService.createEmergencyCalledAlert(this);
+
+        cameraView = findViewById(R.id.surface_view);
 
         detector = new FaceDetector.Builder(this)
                 .setProminentFaceOnly(true) // optimize for single, relatively large face
@@ -119,6 +144,28 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem menuItem) {
+        if (menuItem.getItemId() == R.id.enableAccelItem) {
+            if (menuItem.isChecked()) {
+                menuItem.setChecked(false);
+                useAccelerometer = false;
+            } else {
+                menuItem.setChecked(true);
+                useAccelerometer = true;
+            }
+            return true;
+        }
+        return super.onOptionsItemSelected(menuItem);
+    }
+
+    @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         switch (requestCode) {
             case REQUEST_CAMERA_PERMISSION_ID: {
@@ -141,6 +188,48 @@ public class MainActivity extends AppCompatActivity {
                 }
                 break;
             }
+        }
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+
+        if (useAccelerometer && event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            float x = event.values[0];
+            float y = event.values[1];
+            float z = event.values[2];
+
+            long curTime = System.currentTimeMillis();
+
+            if ((curTime - lastUpdate) > 100) {
+                long diffTime = (curTime - lastUpdate);
+                lastUpdate = curTime;
+
+                float speed = Math.abs(x + y + z - lastX - lastY - lastZ) / diffTime * 10000;
+
+                if (speed > ACC_THRESHOLD) {
+                    Log.d(SENSOR_TAG, "speed: " + speed);
+
+                    if (!crashAlertDialog.isShowing()) {
+                        crashAlertDialog.show();
+                    }
+                }
+
+                lastX = x;
+                lastY = y;
+                lastZ = z;
+            }
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+    }
+
+    public void callEmergency() {
+        if (!emergencyCallAlertDialog.isShowing()) {
+            emergencyCallAlertDialog.show();
         }
     }
 
@@ -215,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
                                 Thread.sleep(300);
                             } catch (InterruptedException ignore) {
                             }
-                            if(!wasClosedToLongVoiceMsg) {
+                            if (!wasClosedToLongVoiceMsg) {
                                 voiceNotifier.sendVoiceNotification(CLOSE_MSG);
                                 wasClosedToLongVoiceMsg = true;
                             }
@@ -348,4 +437,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void prepareSensors() {
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+
+        if (sensorManager != null) {
+            accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            sensorManager.registerListener(MainActivity.this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+            Log.i(SENSOR_TAG, "Sensor initialized correctly!");
+        } else {
+            Toast.makeText(this, "Cannot run accelerometer!", Toast.LENGTH_SHORT).show();
+        }
+
+    }
 }
