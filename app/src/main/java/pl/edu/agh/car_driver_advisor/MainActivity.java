@@ -78,6 +78,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private TextView carSpeedTextView;
     private TextView speedLimitTextView;
+    private TextView weatherTextView;
+    private TextView temperatureTextView;
+    private TextView pressureTextView;
+    private TextView windTextView;
     private ImageView speedOkImageView;
     private ImageView speedAlertImageView;
     private Handler speedLimitChangeHandler;
@@ -108,6 +112,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         speedLimitTextView = findViewById(R.id.speedLimitTextView);
         speedOkImageView = findViewById(R.id.speedOk);
         speedAlertImageView = findViewById(R.id.speedAlert);
+
+        weatherTextView = findViewById(R.id.weatherTextView);
+        temperatureTextView = findViewById(R.id.temperatureTextView);
+        pressureTextView = findViewById(R.id.pressureTextView);
+        windTextView = findViewById(R.id.windTextView);
+
         voiceNotifier = new VoiceNotifier(getApplicationContext());
         speedLimitChangeHandler = new SpeedLimitChangeHandler(this);
         weatherChangeHandler = new WeatherDataUpdateHandler(this);
@@ -380,6 +390,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     };
 
+    private final LocationListener weatherLocationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            System.out.println("STARTING THREAD");
+            new Thread(new WeatherChecker(weatherChangeHandler, location.getLatitude(), location.getLongitude())).start();
+
+        }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+
+        }
+
+        @Override
+        public void onProviderEnabled(String provider) {
+
+        }
+
+        @Override
+        public void onProviderDisabled(String provider) {
+
+        }
+    };
+
     private void accessLocation() {
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         LocationProvider locationProvider = Objects.requireNonNull(locationManager)
@@ -400,6 +434,27 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
+    private void accessLocationForWeather() {
+        System.out.println("STARTING WEATHER DATA DETECTION");
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+        LocationProvider locationProvider = Objects.requireNonNull(locationManager)
+                .getProvider(LocationManager.GPS_PROVIDER);
+
+        if (locationProvider != null) {
+            try {
+                System.out.println("SRT CALLING UPDATES");
+                int locationMinRequestsTimeInterval = 15 * 60 * 1000; // 15min
+                locationManager.requestLocationUpdates(locationProvider.getName(),
+                        locationMinRequestsTimeInterval, 0, this.weatherLocationListener);
+            } catch (SecurityException e) {
+                e.printStackTrace();
+            }
+        } else {
+            Toast.makeText(this, "Location Provider is not available at the moment!",
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -410,6 +465,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     permissionsList.toArray(new String[0]), REQUEST_ALL_REQUIRED_PERMISSIONS_ID);
         } else {
             accessLocation();
+            accessLocationForWeather();
         }
     }
 
@@ -441,7 +497,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         @Override
         public void handleMessage(Message msg) {
             MainActivity activity = mActivity.get();
-            for(String msgKey: msg.getData().keySet()) {
+            for (String msgKey : msg.getData().keySet()) {
                 switch (msgKey) {
                     case CarVelocityChecker.SPEED_LIMIT_MSG_KEY:
                         String speedLimit = msg.getData()
@@ -457,11 +513,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         boolean speedLimitExtended = msg.getData()
                                 .getBoolean(CarVelocityChecker.SPEED_LIMIT_EXTENDED_MSG_KEY);
 
-                        if(speedLimitExtended) {
+                        if (speedLimitExtended) {
                             activity.speedOkImageView.setVisibility(View.INVISIBLE);
                             activity.speedAlertImageView.setVisibility(View.VISIBLE);
-                        }
-                        else {
+                        } else {
                             activity.speedOkImageView.setVisibility(View.VISIBLE);
                             activity.speedAlertImageView.setVisibility(View.INVISIBLE);
                         }
@@ -483,17 +538,33 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
 
     }
+
     private static class WeatherDataUpdateHandler extends Handler {
         private final WeakReference<MainActivity> mActivity;
 
-        WeatherDataUpdateHandler(MainActivity activity){
+        private static final String temperaturePattern = "%s C";
+        private static final String pressurePattern = "%s hPa";
+        private static final String windSpeedPattern = "%s m/s";
+
+        WeatherDataUpdateHandler(MainActivity activity) {
             mActivity = new WeakReference<>(activity);
 
         }
 
         @Override
-        public void handleMessage(Message msg){
+        public void handleMessage(Message msg) {
+
             MainActivity activity = mActivity.get();
+            String temperature = msg.getData().getString("temperature");
+            String wind = msg.getData().getString("wind");
+            String pressure = msg.getData().getString("pressure");
+            String generalWeather = msg.getData().getString("generalWeather");
+
+            activity.weatherTextView.setText(generalWeather);
+            activity.temperatureTextView.setText(String.format(temperaturePattern, temperature));
+            activity.pressureTextView.setText(String.format(pressurePattern, pressure));
+            activity.windTextView.setText(String.format(windSpeedPattern, wind));
+
         }
 
     }
