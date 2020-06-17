@@ -8,4 +8,6 @@
     <string name="speed_limit">Speed limit:</string>
     <string name="init_speed_limit_value">-- km/h</string>
     <string name="enable_collision_detection">Enable collision detection</string>
+    <string name="speed_in_norm">Speed in norm</string>
+    <string name="speed_limit_alert">Speed limit alert</string>
 </resources>
