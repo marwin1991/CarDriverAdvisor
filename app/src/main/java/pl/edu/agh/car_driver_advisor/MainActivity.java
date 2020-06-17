@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat;
 import pl.edu.agh.car_driver_advisor.carvelocity.CarVelocityChecker;
 import pl.edu.agh.car_driver_advisor.carvelocity.VoiceNotifier;
 import pl.edu.agh.car_driver_advisor.sensors.DialogService;
+import pl.edu.agh.car_driver_advisor.weather.WeatherChecker;
 
 import android.Manifest;
 import android.app.AlertDialog;
@@ -47,6 +48,10 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.Timer;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
@@ -76,7 +81,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private ImageView speedOkImageView;
     private ImageView speedAlertImageView;
     private Handler speedLimitChangeHandler;
+    private Handler weatherChangeHandler;
     private VoiceNotifier voiceNotifier;
+    private LocationProvider locationProvider;
+    private ScheduledExecutorService ses;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,6 +110,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         speedAlertImageView = findViewById(R.id.speedAlert);
         voiceNotifier = new VoiceNotifier(getApplicationContext());
         speedLimitChangeHandler = new SpeedLimitChangeHandler(this);
+        weatherChangeHandler = new WeatherDataUpdateHandler(this);
 
         if (!detector.isOperational()) {
             Log.w("MainActivity", "Detector Dependencies are not yet available");
@@ -474,4 +483,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
 
     }
+    private static class WeatherDataUpdateHandler extends Handler {
+        private final WeakReference<MainActivity> mActivity;
+
+        WeatherDataUpdateHandler(MainActivity activity){
+            mActivity = new WeakReference<>(activity);
+
+        }
+
+        @Override
+        public void handleMessage(Message msg){
+            MainActivity activity = mActivity.get();
+        }
+
+    }
+
 }

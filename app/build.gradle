@@ -19,13 +19,25 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+        applicationVariants.all { variant ->
+            variant.buildConfigField "String", "API_KEY", getApiKey("api_key")
+        }
     }
+
     compileOptions {
         sourceCompatibility = 1.8
         targetCompatibility = 1.8
     }
 
 }
+
+static def getApiKey(String property){
+    Properties properties = new Properties()
+    properties.load(new FileInputStream(new File('app/secrets.properties')))
+    println(properties.getProperty(property))
+    return "\"" + properties.getProperty(property) +"\""
+}
+
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
