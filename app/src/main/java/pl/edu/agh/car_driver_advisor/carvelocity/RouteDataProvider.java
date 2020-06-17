@@ -21,6 +21,7 @@ class RouteDataProvider {
     private final static String API_CALL_PATTERN =
             "https://z.overpass-api.de/api/xapi?way[bbox=%f,%f,%f,%f][maxspeed=*]";
     private final static double HALF_SQUARE_SIDE_LENGTH_DEGREES = 0.00025;
+    private final static float CONVERT_MPH_TO_KMH = 1.609344f;
 
     private final DocumentBuilderFactory documentBuilderFactory;
 
@@ -32,7 +33,7 @@ class RouteDataProvider {
      * Returns speed limit of road which is contained in square between given cords
      * (see overpass api - bbox).
      * When there are multiple roads with 'maxspeed' parameter satisfying request,
-     * the lowest speed value will be returned.
+     * the lowest speed value will be returned in kilometers per hour.
      *
      * @param latitude
      * @param longitude
@@ -83,8 +84,17 @@ class RouteDataProvider {
                 .map(Node::getAttributes)
                 .filter(o -> o.getNamedItem("k").getNodeValue().equals("maxspeed"))
                 .map(o -> o.getNamedItem("v").getNodeValue())
-                .map(Integer::parseInt)
+                .map(this::convertSpeedToNumeric)
                 .findFirst();
+    }
+
+    private Integer convertSpeedToNumeric(String speed) {
+        if(speed.contains("mph")) {
+            return Math.round(Integer.parseInt(
+                    speed.replace("mph", "").trim()) * CONVERT_MPH_TO_KMH
+            );
+        }
+        return Integer.parseInt(speed);
     }
 
 }
