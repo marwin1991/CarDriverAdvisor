@@ -435,14 +435,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void accessLocationForWeather() {
-        System.out.println("STARTING WEATHER DATA DETECTION");
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         LocationProvider locationProvider = Objects.requireNonNull(locationManager)
                 .getProvider(LocationManager.GPS_PROVIDER);
 
         if (locationProvider != null) {
             try {
-                System.out.println("SRT CALLING UPDATES");
                 int locationMinRequestsTimeInterval = 15 * 60 * 1000; // 15min
                 locationManager.requestLocationUpdates(locationProvider.getName(),
                         locationMinRequestsTimeInterval, 0, this.weatherLocationListener);

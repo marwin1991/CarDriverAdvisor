@@ -37,7 +37,6 @@ public class WeatherChecker implements Runnable {
     public void run() {
         String weatherForecast;
         try {
-            System.out.println("GETTING WEATHER DATA");
 
             weatherForecast = getJSONWeatherForecast();
 
