@@ -12,12 +12,14 @@ public class CarVelocityChecker implements Runnable {
     private final static float CONVERT_MS_TO_KMH = 3.6f;
     private final static String SPEED_EXCEEDED_NOTIFICATION_MSG = "Przekroczono dopuszczalną prędkość";
     private final static long MIN_TIME_INTERVAL_BETWEEN_API_CALLS_IN_MS = 10000;    // 10s
+    private final static long MIN_TIME_INTERVAL_BETWEEN_NOTIFICATIONS = 20000;    // 20s
 
     public final static String CAR_SPEED_MSG_KEY = "car-speed";
     public final static String SPEED_LIMIT_MSG_KEY = "speed-limit";
     public final static String SPEED_LIMIT_EXTENDED_MSG_KEY = "speed-limit-extended";
 
     private static long lastApiCallTime;
+    private static long lastNotificationTime;
     private static Integer lastApiCallResult;
     private static Location lastLocation;
 
@@ -60,8 +62,10 @@ public class CarVelocityChecker implements Runnable {
             boolean speedLimitExtended = speed > allowedSpeed * MAX_OVERRUN_RATIO;
             sendSpeedLimitUpdateMessageToHandler(allowedSpeed, speedLimitExtended);
 
-            if (speedLimitExtended) {
+            if (speedLimitExtended && location.getTime() >
+                    lastNotificationTime + MIN_TIME_INTERVAL_BETWEEN_NOTIFICATIONS) {
                 voiceNotifier.sendVoiceNotification(SPEED_EXCEEDED_NOTIFICATION_MSG);
+                lastNotificationTime = location.getTime();
             }
         }
     }
