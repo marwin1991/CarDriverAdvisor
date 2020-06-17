@@ -75,6 +75,9 @@ public class CarVelocityChecker implements Runnable {
             lastLocation = location;
             return true;
         }
+        else if(lastLocation == null) {
+            return false;
+        }
 
         return location.getTime() < lastLocation.getTime();
     }

@@ -55,8 +55,8 @@ public class DriveTimeMonitor {
             driveTime += msElapsedSinceLastUpdate;
             breakTime = 0; lastBreakLocation = location;
             BreakRecommendation r = selectBreakRecommendation();
-            requiredBreak = r.getRequiredBreakTimeMs();
             if (r != null && location.getTime() - lastAlertTriggeredTime > INTERVAL_BETWEEN_ALERTS_MS) {
+                requiredBreak = r.getRequiredBreakTimeMs();
                 notifyRecommendation(r);
                 lastAlertTriggeredTime = location.getTime();
             }
