@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat;
 
 import pl.edu.agh.car_driver_advisor.carvelocity.CarVelocityChecker;
 import pl.edu.agh.car_driver_advisor.carvelocity.VoiceNotifier;
+import pl.edu.agh.car_driver_advisor.driveTimeMonitor.DriveTimeMonitor;
 import pl.edu.agh.car_driver_advisor.sensors.DialogService;
 
 import android.Manifest;
@@ -60,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     FaceDetector detector;
     SensorManager sensorManager;
     Sensor accelerometer;
+    private DriveTimeMonitor driveTimeMonitor;
 
     private AlertDialog crashAlertDialog;
     private AlertDialog emergencyCallAlertDialog;
@@ -96,6 +98,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         speedLimitTextView = findViewById(R.id.speedLimitTextView);
         voiceNotifier = new VoiceNotifier(getApplicationContext());
         speedLimitChangeHandler = new SpeedLimitChangeHandler(this);
+        driveTimeMonitor = new DriveTimeMonitor((String msg) -> {
+            voiceNotifier.sendVoiceNotification(msg);
+            Alert.makeAlert(MainActivity.this.getLayoutInflater(), MainActivity.this, msg);
+        });
 
         if (!detector.isOperational()) {
             Log.w("MainActivity", "Detector Dependencies are not yet available");
@@ -139,7 +145,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     cameraSource.stop();
                 }
             });
-
         }
     }
 
@@ -340,6 +345,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void onLocationChanged(Location location) {
             final double latitude = location.getLatitude();
             final double longitude = location.getLongitude();
+
+            driveTimeMonitor.update(location);
 
             if (location.hasSpeed()) {
                 double speed = location.getSpeed();
