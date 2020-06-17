@@ -14,7 +14,7 @@ public class VoiceNotifier {
     public VoiceNotifier(Context applicationContext) {
         this.tts = new TextToSpeech(applicationContext, status -> {
             if (status == TextToSpeech.SUCCESS) {
-                if(tts.isLanguageAvailable(Locale.US)==TextToSpeech.LANG_AVAILABLE)
+                if(tts.isLanguageAvailable(Locale.US) == TextToSpeech.LANG_AVAILABLE)
                     tts.setLanguage(Locale.US);
             } else if (status == TextToSpeech.ERROR) {
                 Toast.makeText(applicationContext, "Text To Speech failed...",

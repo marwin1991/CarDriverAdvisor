@@ -30,6 +30,8 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -71,6 +73,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private TextView carSpeedTextView;
     private TextView speedLimitTextView;
+    private ImageView speedOkImageView;
+    private ImageView speedAlertImageView;
     private Handler speedLimitChangeHandler;
     private VoiceNotifier voiceNotifier;
 
@@ -94,6 +98,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         carSpeedTextView = findViewById(R.id.carSpeedTextView);
         speedLimitTextView = findViewById(R.id.speedLimitTextView);
+        speedOkImageView = findViewById(R.id.speedOk);
+        speedAlertImageView = findViewById(R.id.speedAlert);
         voiceNotifier = new VoiceNotifier(getApplicationContext());
         speedLimitChangeHandler = new SpeedLimitChangeHandler(this);
 
@@ -338,19 +344,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         @Override
         public void onLocationChanged(Location location) {
-            final double latitude = location.getLatitude();
-            final double longitude = location.getLongitude();
-
-            if (location.hasSpeed()) {
+            if (location.hasSpeed() && location.getSpeed() > 0.0) {
                 double speed = location.getSpeed();
-                carSpeedTextView.setText(String.format("%s km/h",
-                        Math.round(speed * 36) / 10.0));
-                new Thread(new CarVelocityChecker(voiceNotifier, latitude, longitude, speed,
+                new Thread(new CarVelocityChecker(voiceNotifier, location, speed,
                         speedLimitChangeHandler)).start();
             } else {
-                // Speed could be calculated "manually" here. Distance to last location and time.
-                String noSignalMsg = "GPS signal lost";
-                carSpeedTextView.setText(noSignalMsg);
+                new Thread(new CarVelocityChecker(voiceNotifier, location, -1.0,
+                        speedLimitChangeHandler)).start();
             }
         }
 
@@ -422,8 +422,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private static class SpeedLimitChangeHandler extends Handler {
-
         private final WeakReference<MainActivity> mActivity;
+        private final static String SPEED_PATTERN = "%s km/h";
 
         SpeedLimitChangeHandler(MainActivity activity) {
             mActivity = new WeakReference<>(activity);
@@ -432,8 +432,33 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         @Override
         public void handleMessage(Message msg) {
             MainActivity activity = mActivity.get();
-            String speedLimit = msg.getData().getString(CarVelocityChecker.SPEED_LIMIT_MSG_KEY);
-            activity.speedLimitTextView.setText(String.format("%s km/h", speedLimit));
+            for(String msgKey: msg.getData().keySet()) {
+                switch (msgKey) {
+                    case CarVelocityChecker.SPEED_LIMIT_MSG_KEY:
+                        String speedLimit = msg.getData()
+                                .getString(CarVelocityChecker.SPEED_LIMIT_MSG_KEY);
+                        activity.speedLimitTextView.setText(String.format(SPEED_PATTERN, speedLimit));
+                        break;
+                    case CarVelocityChecker.CAR_SPEED_MSG_KEY:
+                        String carSpeed = msg.getData()
+                                .getString(CarVelocityChecker.CAR_SPEED_MSG_KEY);
+                        activity.carSpeedTextView.setText(String.format(SPEED_PATTERN, carSpeed));
+                        break;
+                    case CarVelocityChecker.SPEED_LIMIT_EXTENDED_MSG_KEY:
+                        boolean speedLimitExtended = msg.getData()
+                                .getBoolean(CarVelocityChecker.SPEED_LIMIT_EXTENDED_MSG_KEY);
+
+                        if(speedLimitExtended) {
+                            activity.speedOkImageView.setVisibility(View.INVISIBLE);
+                            activity.speedAlertImageView.setVisibility(View.VISIBLE);
+                        }
+                        else {
+                            activity.speedOkImageView.setVisibility(View.VISIBLE);
+                            activity.speedAlertImageView.setVisibility(View.INVISIBLE);
+                        }
+                        break;
+                }
+            }
         }
     }
 
